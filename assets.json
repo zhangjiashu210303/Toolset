@@ -8,5 +8,10 @@
     "name": "ZIP 解密",
     "image": "./images/zip.svg",
     "link": "./SHAandZIP.html"
+  },
+  {
+    "name": "Shader Rendering",
+    "image": "./images/shader.svg",
+    "link": "./ShaderRendering.html"
   }
 ]
