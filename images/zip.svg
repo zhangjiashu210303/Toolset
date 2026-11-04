@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" fill="none" role="img" aria-label="ZIP 解密">
+  <defs>
+    <linearGradient id="zipBg" x1="6" y1="6" x2="90" y2="90" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2fe0a0" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#40b4ff" stop-opacity=".16"/>
+    </linearGradient>
+    <linearGradient id="zipLine" x1="30" y1="22" x2="70" y2="76" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9dffd6"/>
+      <stop offset="1" stop-color="#8fe0ff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 底板 -->
+  <rect x="4" y="4" width="88" height="88" rx="24"
+        fill="url(#zipBg)" stroke="#ffffff" stroke-opacity=".18" stroke-width="1.5"/>
+
+  <!-- 文档外形 + 折角 -->
+  <path d="M36 18h20l14 14v38a7 7 0 0 1-7 7H36a7 7 0 0 1-7-7V25a7 7 0 0 1 7-7Z"
+        fill="#ffffff" fill-opacity=".09"
+        stroke="url(#zipLine)" stroke-width="2.6" stroke-linejoin="round"/>
+  <path d="M56 18v14h14"
+        stroke="url(#zipLine)" stroke-width="2.6" stroke-linejoin="round" fill="none"/>
+
+  <!-- 拉链齿（两条虚线） -->
+  <g stroke="url(#zipLine)" stroke-width="2" stroke-linecap="round" stroke-dasharray="2.5 5">
+    <path d="M43 34v38"/>
+    <path d="M53 34v38"/>
+  </g>
+
+  <!-- 拉链中带 -->
+  <path d="M48 32v40" stroke="url(#zipLine)" stroke-width="2.2" stroke-linecap="round"/>
+
+  <!-- 拉头 -->
+  <rect x="42" y="26" width="12" height="8" rx="2.5"
+        fill="#ffffff" fill-opacity=".14"
+        stroke="url(#zipLine)" stroke-width="2"/>
+</svg>
