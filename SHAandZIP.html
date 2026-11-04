@@ -1,0 +1,1568 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GPU+CPU 双引擎破解器 · 哈希/盐/ZIP</title>
+<style>
+:root{--bg:#0d1117;--panel:#161b22;--border:#30363d;--text:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922;--purple:#a371f7}
+*{box-sizing:border-box}
+body{margin:0;padding:22px 14px;background:var(--bg);color:var(--text);min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+.app{max-width:980px;margin:0 auto}
+h1{font-size:20px;margin:0 0 6px;font-weight:700}
+.sub{color:var(--muted);font-size:13px;margin-bottom:18px;line-height:1.6}
+.tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.tabs button{padding:8px 18px;border-radius:8px;border:1px solid var(--border);background:#21262d;color:var(--muted);cursor:pointer;font-size:13px;font-weight:600;transition:.15s;font-family:inherit}
+.tabs button.active{background:var(--accent);border-color:var(--accent);color:#0d1117}
+.tabs button:hover:not(.active){background:#30363d;color:var(--text)}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px}
+.field{margin-bottom:12px}
+.field:last-child{margin-bottom:0}
+label.lbl{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;letter-spacing:.3px}
+input[type=text],input[type=number],select{width:100%;padding:9px 12px;border-radius:6px;border:1px solid var(--border);background:#0d1117;color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;outline:none;transition:border-color .15s}
+input[type=text]:focus,input[type=number]:focus,select:focus{border-color:var(--accent)}
+select{cursor:pointer}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row>.field{flex:1;min-width:130px}
+.checks{display:flex;gap:18px;flex-wrap:wrap;padding-top:2px}
+.checks label{display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;user-select:none}
+input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;margin:0}
+.btns{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+button{padding:10px 22px;border-radius:6px;border:1px solid var(--border);background:#21262d;color:var(--text);font-size:14px;cursor:pointer;transition:.15s;font-family:inherit}
+button:hover:not(:disabled){background:#30363d}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.primary{background:var(--accent);border-color:var(--accent);color:#0d1117;font-weight:600}
+button.primary:hover:not(:disabled){background:#79b8ff}
+button.danger{background:var(--red);border-color:var(--red);color:#fff;font-weight:600}
+button.ghost{font-size:13px;padding:10px 16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px}
+.stat{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+.stat .k{font-size:11px;color:var(--muted);letter-spacing:.6px;text-transform:uppercase}
+.stat .v{font-size:18px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+.engine{margin-bottom:12px}
+.engine:last-child{margin-bottom:0}
+.engine .head{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px}
+.engine .head .name{font-weight:700;display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.name.gpu{color:var(--purple)} .name.gpu .dot{background:var(--purple)}
+.name.cpu{color:var(--orange)} .name.cpu .dot{background:var(--orange)}
+.engine .head .num{color:var(--muted);font-variant-numeric:tabular-nums;font-family:ui-monospace,monospace}
+.bar{height:6px;border-radius:4px;background:#21262d;overflow:hidden}
+.bar>div{height:100%;width:0;transition:width .12s linear;border-radius:4px}
+.bar.gpu>div{background:linear-gradient(90deg,#7c3aed,#a371f7)}
+.bar.cpu>div{background:linear-gradient(90deg,#b45309,#d29922)}
+.result{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;display:none;margin-top:14px}
+.result.show{display:block;animation:pop .25s ease}
+@keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.result.found{border-color:var(--green);box-shadow:0 0 0 1px rgba(63,185,80,.35),0 0 24px rgba(63,185,80,.12)}
+.result .label{font-size:12px;color:var(--muted);margin-bottom:8px;letter-spacing:.4px}
+.result .plain{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:26px;font-weight:800;color:var(--green);word-break:break-all;letter-spacing:1.5px;line-height:1.3}
+.result .meta{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.8}
+.result .meta b{color:var(--text);font-weight:600}
+.warn{color:var(--orange);font-size:12px;margin-top:8px;line-height:1.7}
+.warn:empty{display:none}
+.err{color:var(--red);font-size:13px;margin-top:8px}
+.err:empty{display:none}
+code{background:#21262d;padding:1px 5px;border-radius:4px;font-size:12px}
+.zipinfo{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.8}
+.zipinfo b{color:var(--text)}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>⚡ GPU + CPU 双引擎破解器 · 哈希 / 盐 / ZIP</h1>
+  <div class="sub">支持 SHA-256 / SHA-1 / MD5、前置/后缀/模板盐、大小写变换、ZIP 密码（ZipCrypto）破解。ZIP 命中后做完整 CRC 验证，消灭 1/256 误报。</div>
+
+  <div class="tabs">
+    <button data-mode="hash" class="active">🔑 哈希反查</button>
+    <button data-mode="zip">🗜️ ZIP 密码破解</button>
+  </div>
+
+  <div id="hashPanel" class="panel">
+    <div class="field">
+      <label class="lbl">目标哈希值</label>
+      <input type="text" id="hashInput" spellcheck="false" autocomplete="off"
+             placeholder="SHA-256: 64位十六进制 / SHA-1: 40位 / MD5: 32位">
+    </div>
+    <div class="row">
+      <div class="field">
+        <label class="lbl">哈希算法</label>
+        <select id="algoSelect">
+          <option value="sha256">SHA-256（GPU 加速）</option>
+          <option value="sha1">SHA-1（CPU）</option>
+          <option value="md5">MD5（CPU）</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="lbl">大小写变换（作用于原文）</label>
+        <select id="caseMode">
+          <option value="none">原样</option>
+          <option value="lower">全小写</option>
+          <option value="upper">全大写</option>
+          <option value="capitalize">首字母大写</option>
+          <option value="reverse">反转字符串</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div id="zipPanel" class="panel" style="display:none">
+    <div class="field">
+      <label class="lbl">上传加密 ZIP 文件（ZipCrypto 传统加密）</label>
+      <input type="file" id="zipFile" accept=".zip,application/zip"
+             style="width:100%;padding:8px;border:1px dashed var(--border);border-radius:6px;background:#0d1117;color:var(--text);font-size:13px">
+    </div>
+    <div class="zipinfo" id="zipInfo"></div>
+    <div class="warn" id="zipWarn"></div>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <div class="field">
+        <label class="lbl">盐类型（ZIP 密码为整体，建议无盐）</label>
+        <select id="saltType">
+          <option value="none">无盐</option>
+          <option value="prefix">前置盐（salt + 原文）</option>
+          <option value="suffix">后缀盐（原文 + salt）</option>
+          <option value="template">自定义模板（用 {word} 占位）</option>
+        </select>
+      </div>
+      <div class="field" id="saltValueField" style="display:none">
+        <label class="lbl">盐值 / 模板</label>
+        <input type="text" id="saltValue" placeholder="例如：abc 或 user_{word}_2024">
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <div class="field">
+        <label class="lbl">大概位数</label>
+        <input type="number" id="lenInput" value="4" min="1" max="40" step="1">
+      </div>
+      <div class="field">
+        <label class="lbl">位数误差范围</label>
+        <select id="errSelect">
+          <option value="0">±0（精确位数）</option>
+          <option value="1" selected>±1</option>
+          <option value="2">±2</option>
+          <option value="3">±3</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label class="lbl">字符集（可多选）</label>
+      <div class="checks">
+        <label><input type="checkbox" id="cbLower" checked> 小写 a-z</label>
+        <label><input type="checkbox" id="cbUpper"> 大写 A-Z</label>
+        <label><input type="checkbox" id="cbDigit" checked> 数字 0-9</label>
+        <label><input type="checkbox" id="cbSpecial"> 特殊符号</label>
+      </div>
+    </div>
+    <div class="field" id="specialField" style="display:none">
+      <label class="lbl">特殊符号集合</label>
+      <input type="text" id="specialChars" value="!@#$%^&*()_+-=[]{}|;:,.<>?/~">
+    </div>
+
+    <div class="btns">
+      <button class="primary" id="btnStart">开始破解</button>
+      <button class="danger" id="btnStop" disabled>停止</button>
+      <button class="ghost" id="btnRandomHash">生成测试哈希</button>
+      <button class="ghost" id="btnMakeZip" style="display:none">生成测试 ZIP</button>
+    </div>
+    <div class="err" id="errBox"></div>
+    <div class="warn" id="warnBox"></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">总尝试</div><div class="v" id="stTotal">0</div></div>
+    <div class="stat"><div class="k">运行时间</div><div class="v" id="stTime">0.0s</div></div>
+    <div class="stat"><div class="k">总速度</div><div class="v" id="stSpeed">0 H/s</div></div>
+    <div class="stat"><div class="k">搜索空间</div><div class="v" id="stSpace">—</div></div>
+    <div class="stat"><div class="k">已排除假阳性</div><div class="v" id="stFP">0</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="engine">
+      <div class="head"><span class="name gpu"><span class="dot"></span>GPU Shader</span><span class="num" id="gpuNum">0 次 · 0 H/s</span></div>
+      <div class="bar gpu"><div id="gpuBar"></div></div>
+    </div>
+    <div class="engine">
+      <div class="head"><span class="name cpu"><span class="dot"></span>CPU Worker</span><span class="num" id="cpuNum">0 次 · 0 H/s</span></div>
+      <div class="bar cpu"><div id="cpuBar"></div></div>
+    </div>
+  </div>
+
+  <div class="result" id="resultBox">
+    <div class="label" id="resultLabel">✅ 找到匹配</div>
+    <div class="plain" id="resultPlain">—</div>
+    <div class="meta" id="resultMeta"></div>
+  </div>
+</div>
+
+<canvas id="glcanvas" width="256" height="256" style="position:fixed;left:-99999px;top:0;width:1px;height:1px"></canvas>
+
+<script>
+(function(){
+'use strict';
+
+/* ============================================================
+ *  常量
+ * ============================================================ */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[i] = c >>> 0;
+  }
+  return t;
+})();
+
+const BLOCK_SIZE = 65536;
+const MAX_LEN_GPU = 54;
+const MAX_SPACE_PER_LEN = 4294967295;
+const MAX_CHARS_GPU = 96;
+const MAX_SALT_GPU  = 32;
+
+/* ============================================================
+ *  工具
+ * ============================================================ */
+const $ = id => document.getElementById(id);
+function fmt(n){
+  if (!isFinite(n)) return '∞';
+  if (n >= 1e12) return (n/1e12).toFixed(2)+'T';
+  if (n >= 1e9)  return (n/1e9).toFixed(2)+'B';
+  if (n >= 1e6)  return (n/1e6).toFixed(2)+'M';
+  if (n >= 1e3)  return (n/1e3).toFixed(1)+'K';
+  return String(Math.floor(n));
+}
+function hexToBytes(hex){
+  const a = new Uint8Array(hex.length/2);
+  for (let i=0;i<a.length;i++) a[i] = parseInt(hex.substr(i*2,2),16);
+  return a;
+}
+function bytesToHex(bytes){
+  let s = '';
+  for (let i=0;i<bytes.length;i++) s += bytes[i].toString(16).padStart(2,'0');
+  return s;
+}
+function utf8Bytes(str){
+  return new TextEncoder().encode(str);
+}
+function indexToWord(index, len, charset){
+  const base = charset.length;
+  const out = new Array(len);
+  let t = index;
+  for (let p = len-1; p >= 0; p--){ out[p] = charset[t % base]; t = Math.floor(t / base); }
+  return out.join('');
+}
+function applyCase(word, mode){
+  switch(mode){
+    case 'lower': return word.toLowerCase();
+    case 'upper': return word.toUpperCase();
+    case 'capitalize': return word.charAt(0).toUpperCase()+word.slice(1);
+    case 'reverse': return word.split('').reverse().join('');
+    default: return word;
+  }
+}
+
+/* ============================================================
+ *  任务池（支持 pushFront 放回未试部分）
+ * ============================================================ */
+class TaskPool {
+  constructor(lens, baseN, blockSize){
+    this.lens = lens.slice();
+    this.baseN = baseN;
+    this.blockSize = blockSize || BLOCK_SIZE;
+    this.li = 0;
+    this.offset = 0;
+    this.pending = [];
+    this.totalSpace = 0;
+    for (const L of lens) this.totalSpace += Math.pow(baseN, L);
+  }
+  next(){
+    if (this.pending.length) return this.pending.pop();
+    while (this.li < this.lens.length){
+      const L = this.lens[this.li];
+      const space = Math.pow(this.baseN, L);
+      if (this.offset >= space){ this.li++; this.offset = 0; continue; }
+      const count = Math.min(this.blockSize, space - this.offset);
+      const block = { len: L, start: this.offset, count };
+      this.offset += count;
+      return block;
+    }
+    return null;
+  }
+  pushFront(block){ if (block.count > 0) this.pending.push(block); }
+}
+
+/* ============================================================
+ *  GPU 着色器（uvec4 打包）
+ * ============================================================ */
+const VS_SRC = `#version 300 es
+in vec2 a_pos;
+void main(){ gl_Position = vec4(a_pos,0.0,1.0); }`;
+
+const FS_SHA256 = `#version 300 es
+precision highp float; precision highp int;
+out vec4 fragColor;
+uniform uint uBase;
+uniform uint uRemaining;
+uniform int  uLen;
+uniform uint uBaseN;
+uniform int  uWidth;
+uniform uvec4 uCharsPacked[24];
+uniform uvec4 uPrefixPacked[8];
+uniform int   uPrefixLen;
+uniform uvec4 uSuffixPacked[8];
+uniform int   uSuffixLen;
+uniform int   uCaseMode;
+uniform uvec4 uTargetPacked[2];
+
+const uint K[64] = uint[64](
+0x428a2f98u,0x71374491u,0xb5c0fbcfu,0xe9b5dba5u,0x3956c25bu,0x59f111f1u,0x923f82a4u,0xab1c5ed5u,
+0xd807aa98u,0x12835b01u,0x243185beu,0x550c7dc3u,0x72be5d74u,0x80deb1feu,0x9bdc06a7u,0xc19bf174u,
+0xe49b69c1u,0xefbe4786u,0x0fc19dc6u,0x240ca1ccu,0x2de92c6fu,0x4a7484aau,0x5cb0a9dcu,0x76f988dau,
+0x983e5152u,0xa831c66du,0xb00327c8u,0xbf597fc7u,0xc6e00bf3u,0xd5a79147u,0x06ca6351u,0x14292967u,
+0x27b70a85u,0x2e1b2138u,0x4d2c6dfcu,0x53380d13u,0x650a7354u,0x766a0abbu,0x81c2c92eu,0x92722c85u,
+0xa2bfe8a1u,0xa81a664bu,0xc24b8b70u,0xc76c51a3u,0xd192e819u,0xd6990624u,0xf40e3585u,0x106aa070u,
+0x19a4c116u,0x1e376c08u,0x2748774cu,0x34b0bcb5u,0x391c0cb3u,0x4ed8aa4au,0x5b9cca4fu,0x682e6ff3u,
+0x748f82eeu,0x78a5636fu,0x84c87814u,0x8cc70208u,0x90befffau,0xa4506cebu,0xbef9a3f7u,0xc67178f2u);
+
+uint rotr(uint x, uint n){ return (x>>n)|(x<<(32u-n)); }
+uint charsGet(int i){ uvec4 v = uCharsPacked[i>>2]; return v[i&3]; }
+uint prefixGet(int i){ uvec4 v = uPrefixPacked[i>>2]; return v[i&3]; }
+uint suffixGet(int i){ uvec4 v = uSuffixPacked[i>>2]; return v[i&3]; }
+uint targetGet(int i){ uvec4 v = uTargetPacked[i>>2]; return v[i&3]; }
+
+void main(){
+  ivec2 pp = ivec2(gl_FragCoord.xy);
+  uint local = uint(pp.y)*uint(uWidth)+uint(pp.x);
+  if (local >= uRemaining){ fragColor = vec4(0.0); return; }
+  uint idx = uBase + local;
+
+  uint wb[64];
+  uint t = idx;
+  for (int q=0; q<uLen; q++){
+    int pos = uLen-1-q;
+    uint d = t % uBaseN; t = t / uBaseN;
+    wb[pos] = charsGet(int(d));
+  }
+  if (uCaseMode == 1){ for (int i=0;i<uLen;i++){ if (wb[i]>=65u&&wb[i]<=90u) wb[i]+=32u; } }
+  else if (uCaseMode == 2){ for (int i=0;i<uLen;i++){ if (wb[i]>=97u&&wb[i]<=122u) wb[i]-=32u; } }
+  else if (uCaseMode == 3){ if (uLen>0 && wb[0]>=97u && wb[0]<=122u) wb[0]-=32u; }
+  else if (uCaseMode == 4){ for (int i=0;i<uLen/2;i++){ uint tmp=wb[i]; wb[i]=wb[uLen-1-i]; wb[uLen-1-i]=tmp; } }
+
+  uint msg[64]; int mlen=0;
+  for (int i=0;i<uPrefixLen;i++) msg[mlen++]=prefixGet(i);
+  for (int i=0;i<uLen;i++)      msg[mlen++]=wb[i];
+  for (int i=0;i<uSuffixLen;i++) msg[mlen++]=suffixGet(i);
+
+  uint w[16];
+  for (int i=0;i<16;i++) w[i]=0u;
+  for (int i=0;i<mlen;i++){
+    int wi=i>>2; int sh=(3-(i&3))*8;
+    w[wi] |= msg[i] << uint(sh);
+  }
+  w[mlen>>2] |= 0x80u << uint((3-(mlen&3))*8);
+  w[15] = uint(mlen) << 3u;
+
+  uint wv[64];
+  for (int i=0;i<16;i++) wv[i]=w[i];
+  for (int i=16;i<64;i++){
+    uint s0 = rotr(wv[i-15],7u)^rotr(wv[i-15],18u)^(wv[i-15]>>3u);
+    uint s1 = rotr(wv[i-2],17u)^rotr(wv[i-2],19u)^(wv[i-2]>>10u);
+    wv[i] = wv[i-16]+s0+wv[i-7]+s1;
+  }
+
+  uint a=0x6a09e667u,b=0xbb67ae85u,c=0x3c6ef372u,d2=0xa54ff53au;
+  uint e=0x510e527fu,f=0x9b05688cu,g=0x1f83d9abu,h=0x5be0cd19u;
+  for (int i=0;i<64;i++){
+    uint S1 = rotr(e,6u)^rotr(e,11u)^rotr(e,25u);
+    uint ch = (e&f)^((~e)&g);
+    uint t1 = h+S1+ch+K[i]+wv[i];
+    uint S0 = rotr(a,2u)^rotr(a,13u)^rotr(a,22u);
+    uint mj = (a&b)^(a&c)^(b&c);
+    uint t2 = S0+mj;
+    h=g;g=f;f=e;e=d2+t1;d2=c;c=b;b=a;a=t1+t2;
+  }
+  a+=0x6a09e667u;b+=0xbb67ae85u;c+=0x3c6ef372u;d2+=0xa54ff53au;
+  e+=0x510e527fu;f+=0x9b05688cu;g+=0x1f83d9abu;h+=0x5be0cd19u;
+
+  bool hit = (a==targetGet(0))&&(b==targetGet(1))&&(c==targetGet(2))&&(d2==targetGet(3))
+          && (e==targetGet(4))&&(f==targetGet(5))&&(g==targetGet(6))&&(h==targetGet(7));
+  fragColor = hit ? vec4(1.0) : vec4(0.0);
+}`;
+
+const FS_ZIP = `#version 300 es
+precision highp float; precision highp int;
+out vec4 fragColor;
+uniform uint uBase;
+uniform uint uRemaining;
+uniform int  uLen;
+uniform uint uBaseN;
+uniform int  uWidth;
+uniform uvec4 uCharsPacked[24];
+uniform uvec4 uPrefixPacked[8];
+uniform int   uPrefixLen;
+uniform uvec4 uSuffixPacked[8];
+uniform int   uSuffixLen;
+uniform int   uCaseMode;
+uniform uvec4 uEncHeaderPacked[3];
+uniform uint  uCheckByte;
+uniform uvec4 uCRCTablePacked[64];
+
+uint charsGet(int i){ uvec4 v = uCharsPacked[i>>2]; return v[i&3]; }
+uint prefixGet(int i){ uvec4 v = uPrefixPacked[i>>2]; return v[i&3]; }
+uint suffixGet(int i){ uvec4 v = uSuffixPacked[i>>2]; return v[i&3]; }
+uint encHeaderGet(int i){ uvec4 v = uEncHeaderPacked[i>>2]; return v[i&3]; }
+uint crcTableGet(uint idx){ uvec4 v = uCRCTablePacked[idx>>2u]; return v[idx&3u]; }
+uint crc32u(uint crc, uint b){
+  uint idx = (crc ^ b) & 0xFFu;
+  return (crc >> 8u) ^ crcTableGet(idx);
+}
+
+void main(){
+  ivec2 pp = ivec2(gl_FragCoord.xy);
+  uint local = uint(pp.y)*uint(uWidth)+uint(pp.x);
+  if (local >= uRemaining){ fragColor = vec4(0.0); return; }
+  uint idx = uBase + local;
+
+  uint wb[64];
+  uint t = idx;
+  for (int q=0;q<uLen;q++){
+    int pos = uLen-1-q;
+    uint d = t % uBaseN; t = t / uBaseN;
+    wb[pos] = charsGet(int(d));
+  }
+  if (uCaseMode == 1){ for (int i=0;i<uLen;i++){ if (wb[i]>=65u&&wb[i]<=90u) wb[i]+=32u; } }
+  else if (uCaseMode == 2){ for (int i=0;i<uLen;i++){ if (wb[i]>=97u&&wb[i]<=122u) wb[i]-=32u; } }
+  else if (uCaseMode == 3){ if (uLen>0 && wb[0]>=97u && wb[0]<=122u) wb[0]-=32u; }
+  else if (uCaseMode == 4){ for (int i=0;i<uLen/2;i++){ uint tmp=wb[i]; wb[i]=wb[uLen-1-i]; wb[uLen-1-i]=tmp; } }
+
+  uint pass[128]; int plen=0;
+  for (int i=0;i<uPrefixLen;i++) pass[plen++]=prefixGet(i);
+  for (int i=0;i<uLen;i++)      pass[plen++]=wb[i];
+  for (int i=0;i<uSuffixLen;i++) pass[plen++]=suffixGet(i);
+
+  uint k0=0x12345678u,k1=0x23456789u,k2=0x34567890u;
+  for (int i=0;i<plen;i++){
+    uint b = pass[i];
+    k0 = crc32u(k0, b);
+    k1 = (k1 + (k0 & 0xFFu)) * 134775813u + 1u;
+    k2 = crc32u(k2, k1 >> 24u);
+  }
+  uint lastByte = 0u;
+  for (int i=0;i<12;i++){
+    uint tmp = (k2 | 2u) & 0xFFFFu;
+    uint decB = encHeaderGet(i) ^ (((tmp*(tmp^1u))>>8u)&0xFFu);
+    lastByte = decB;
+    k0 = crc32u(k0, decB);
+    k1 = (k1 + (k0 & 0xFFu)) * 134775813u + 1u;
+    k2 = crc32u(k2, k1 >> 24u);
+  }
+  bool hit = (lastByte == uCheckByte);
+  fragColor = hit ? vec4(1.0) : vec4(0.0);
+}`;
+
+function compileShader(gl, type, src){
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+    throw new Error('Shader 编译失败: ' + gl.getShaderInfoLog(s));
+  return s;
+}
+
+class GPUEngine {
+  constructor(canvas){
+    const gl = canvas.getContext('webgl2', {
+      antialias:false, alpha:false, depth:false, stencil:false,
+      preserveDrawingBuffer:false, powerPreference:'high-performance'
+    });
+    if (!gl) throw new Error('当前浏览器不支持 WebGL2');
+    this.gl = gl;
+    this.W = 256; this.H = 256;
+    this.pixels = new Uint8Array(this.W*this.H*4);
+    this.pixels32 = new Uint32Array(this.pixels.buffer);
+    const vs = compileShader(gl, gl.VERTEX_SHADER, VS_SRC);
+    this.progSHA = this._buildProgram(vs, FS_SHA256);
+    this.progZIP = this._buildProgram(vs, FS_ZIP);
+    this.vao = gl.createVertexArray();
+    gl.bindVertexArray(this.vao);
+    const vb = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+    gl.bindVertexArray(null);
+    this.tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, this.W, this.H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    this.fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.tex, 0);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE)
+      throw new Error('FBO 创建失败');
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
+  }
+  _buildProgram(vs, fsSrc){
+    const gl = this.gl;
+    const fs = compileShader(gl, gl.FRAGMENT_SHADER, fsSrc);
+    const p = gl.createProgram();
+    gl.attachShader(p, vs); gl.attachShader(p, fs); gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS))
+      throw new Error('Program 链接失败: ' + gl.getProgramInfoLog(p));
+    const loc = {};
+    const names = ['uBase','uRemaining','uLen','uBaseN','uWidth',
+                   'uCharsPacked','uPrefixPacked','uPrefixLen','uSuffixPacked','uSuffixLen','uCaseMode',
+                   'uTargetPacked','uEncHeaderPacked','uCheckByte','uCRCTablePacked'];
+    for (const n of names) loc[n] = gl.getUniformLocation(p, n);
+    return { program:p, loc };
+  }
+  prepare(task){
+    const pChars = new Uint32Array(MAX_CHARS_GPU);
+    pChars.set(task.charsU32.slice(0, MAX_CHARS_GPU));
+    task._packedChars = pChars;
+    const pPrefix = new Uint32Array(MAX_SALT_GPU);
+    pPrefix.set(task.prefixU32.slice(0, MAX_SALT_GPU));
+    task._packedPrefix = pPrefix;
+    const pSuffix = new Uint32Array(MAX_SALT_GPU);
+    pSuffix.set(task.suffixU32.slice(0, MAX_SALT_GPU));
+    task._packedSuffix = pSuffix;
+    if (task.mode === 'zip'){
+      const pHdr = new Uint32Array(12);
+      pHdr.set(task.encHeaderU32.slice(0, 12));
+      task._packedEncHeader = pHdr;
+    } else {
+      const pTgt = new Uint32Array(8);
+      pTgt.set(task.targetU32);
+      task._packedTarget = pTgt;
+    }
+  }
+  step(block, task){
+    const gl = this.gl;
+    const { len, start, count } = block;
+    const isZip = task.mode === 'zip';
+    const pobj = isZip ? this.progZIP : this.progSHA;
+    const L = pobj.loc;
+    gl.viewport(0,0,this.W,this.H);
+    gl.useProgram(pobj.program);
+    gl.bindVertexArray(this.vao);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
+    gl.uniform1ui(L.uBase, start);
+    gl.uniform1ui(L.uRemaining, count);
+    gl.uniform1i(L.uLen, len);
+    gl.uniform1ui(L.uBaseN, task.baseN);
+    gl.uniform1i(L.uWidth, this.W);
+    gl.uniform4uiv(L.uCharsPacked, task._packedChars);
+    gl.uniform4uiv(L.uPrefixPacked, task._packedPrefix);
+    gl.uniform1i(L.uPrefixLen, task.prefixLen);
+    gl.uniform4uiv(L.uSuffixPacked, task._packedSuffix);
+    gl.uniform1i(L.uSuffixLen, task.suffixLen);
+    gl.uniform1i(L.uCaseMode, task.caseMode);
+    if (isZip){
+      gl.uniform4uiv(L.uEncHeaderPacked, task._packedEncHeader);
+      gl.uniform1ui(L.uCheckByte, task.checkByte);
+      gl.uniform4uiv(L.uCRCTablePacked, CRC_TABLE);
+    } else {
+      gl.uniform4uiv(L.uTargetPacked, task._packedTarget);
+    }
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.readPixels(0,0,this.W,this.H,gl.RGBA,gl.UNSIGNED_BYTE,this.pixels);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindVertexArray(null);
+    const arr = this.pixels32;
+    for (let i=0;i<arr.length;i++){
+      if (arr[i] !== 0){
+        const x = i % this.W;
+        const y = (i / this.W) | 0;
+        return { found:true, index: start + y*this.W + x, len };
+      }
+    }
+    return { found:false };
+  }
+}
+
+/* ============================================================
+ *  CPU Worker
+ * ============================================================ */
+const WORKER_SRC = `
+'use strict';
+const K256 = new Uint32Array([
+0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+function rotr(x,n){ return (x>>>n)|(x<<(32-n)); }
+function sha256(bytes){
+  const len = bytes.length;
+  const padLen = Math.ceil((len+9)/64)*64;
+  const pad = new Uint8Array(padLen);
+  pad.set(bytes); pad[len] = 0x80;
+  const dv = new DataView(pad.buffer);
+  dv.setUint32(padLen-4, (len*8)>>>0, false);
+  dv.setUint32(padLen-8, Math.floor(len*8/4294967296), false);
+  let h0=0x6a09e667,h1=0xbb67ae85,h2=0x3c6ef372,h3=0xa54ff53a,
+      h4=0x510e527f,h5=0x9b05688c,h6=0x1f83d9ab,h7=0x5be0cd19;
+  const w = new Uint32Array(64);
+  for (let off=0; off<padLen; off+=64){
+    for (let i=0;i<16;i++) w[i]=dv.getUint32(off+i*4, false);
+    for (let i=16;i<64;i++){
+      const s0 = rotr(w[i-15],7)^rotr(w[i-15],18)^(w[i-15]>>>3);
+      const s1 = rotr(w[i-2],17)^rotr(w[i-2],19)^(w[i-2]>>>10);
+      w[i] = (w[i-16]+s0+w[i-7]+s1)|0;
+    }
+    let a=h0,b=h1,c=h2,d=h3,e=h4,f=h5,g=h6,h=h7;
+    for (let i=0;i<64;i++){
+      const S1 = rotr(e,6)^rotr(e,11)^rotr(e,25);
+      const ch = (e&f)^(~e&g);
+      const t1 = (h+S1+ch+K256[i]+w[i])|0;
+      const S0 = rotr(a,2)^rotr(a,13)^rotr(a,22);
+      const mj = (a&b)^(a&c)^(b&c);
+      const t2 = (S0+mj)|0;
+      h=g;g=f;f=e;e=(d+t1)|0;d=c;c=b;b=a;a=(t1+t2)|0;
+    }
+    h0=(h0+a)|0;h1=(h1+b)|0;h2=(h2+c)|0;h3=(h3+d)|0;
+    h4=(h4+e)|0;h5=(h5+f)|0;h6=(h6+g)|0;h7=(h7+h)|0;
+  }
+  const out = new Uint8Array(32);
+  const odv = new DataView(out.buffer);
+  odv.setUint32(0,h0,false); odv.setUint32(4,h1,false);
+  odv.setUint32(8,h2,false); odv.setUint32(12,h3,false);
+  odv.setUint32(16,h4,false); odv.setUint32(20,h5,false);
+  odv.setUint32(24,h6,false); odv.setUint32(28,h7,false);
+  return out;
+}
+function rotl(x,n){ return (x<<n)|(x>>>(32-n)); }
+function sha1(bytes){
+  const len = bytes.length;
+  const padLen = Math.ceil((len+9)/64)*64;
+  const pad = new Uint8Array(padLen);
+  pad.set(bytes); pad[len] = 0x80;
+  const dv = new DataView(pad.buffer);
+  dv.setUint32(padLen-4, (len*8)>>>0, false);
+  dv.setUint32(padLen-8, Math.floor(len*8/4294967296), false);
+  let h0=0x67452301,h1=0xEFCDAB89,h2=0x98BADCFE,h3=0x10325476,h4=0xC3D2E1F0;
+  const w = new Uint32Array(80);
+  for (let off=0;off<padLen;off+=64){
+    for (let i=0;i<16;i++) w[i]=dv.getUint32(off+i*4, false);
+    for (let i=16;i<80;i++) w[i]=rotl(w[i-3]^w[i-8]^w[i-14]^w[i-16],1);
+    let a=h0,b=h1,c=h2,d=h3,e=h4;
+    for (let i=0;i<80;i++){
+      let f,k;
+      if (i<20){ f=(b&c)|(~b&d); k=0x5A827999; }
+      else if (i<40){ f=b^c^d; k=0x6ED9EBA1; }
+      else if (i<60){ f=(b&c)|(b&d)|(c&d); k=0x8F1BBCDC; }
+      else { f=b^c^d; k=0xCA62C1D6; }
+      const tmp = (rotl(a,5)+f+e+k+w[i])|0;
+      e=d;d=c;c=rotl(b,30);b=a;a=tmp;
+    }
+    h0=(h0+a)|0;h1=(h1+b)|0;h2=(h2+c)|0;h3=(h3+d)|0;h4=(h4+e)|0;
+  }
+  const out = new Uint8Array(20);
+  const odv = new DataView(out.buffer);
+  odv.setUint32(0,h0,false); odv.setUint32(4,h1,false);
+  odv.setUint32(8,h2,false); odv.setUint32(12,h3,false);
+  odv.setUint32(16,h4,false);
+  return out;
+}
+const MD5_S = [7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,
+               5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,
+               4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,
+               6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21];
+const MD5_K = (() => {
+  const k = new Uint32Array(64);
+  for (let i=0;i<64;i++) k[i] = Math.floor(Math.abs(Math.sin(i+1))*4294967296)>>>0;
+  return k;
+})();
+function md5(bytes){
+  const len = bytes.length;
+  const padLen = Math.ceil((len+9)/64)*64;
+  const pad = new Uint8Array(padLen);
+  pad.set(bytes); pad[len] = 0x80;
+  const dv = new DataView(pad.buffer);
+  dv.setUint32(padLen-8, (len*8)>>>0, true);
+  dv.setUint32(padLen-4, Math.floor(len*8/4294967296), true);
+  let a0=0x67452301,b0=0xefcdab89,c0=0x98badcfe,d0=0x10325476;
+  const M = new Uint32Array(16);
+  for (let off=0;off<padLen;off+=64){
+    for (let i=0;i<16;i++) M[i]=dv.getUint32(off+i*4, true);
+    let A=a0,B=b0,C=c0,D=d0;
+    for (let i=0;i<64;i++){
+      let F,g;
+      if (i<16){ F=(B&C)|(~B&D); g=i; }
+      else if (i<32){ F=(D&B)|(~D&C); g=(5*i+1)%16; }
+      else if (i<48){ F=B^C^D; g=(3*i+5)%16; }
+      else { F=C^(B|~D); g=(7*i)%16; }
+      F = (F+A+MD5_K[i]+M[g])|0;
+      A=D; D=C; C=B;
+      B = (B + ((F<<MD5_S[i])|(F>>>(32-MD5_S[i]))))|0;
+    }
+    a0=(a0+A)|0;b0=(b0+B)|0;c0=(c0+C)|0;d0=(d0+D)|0;
+  }
+  const out = new Uint8Array(16);
+  const odv = new DataView(out.buffer);
+  odv.setUint32(0,a0,true); odv.setUint32(4,b0,true);
+  odv.setUint32(8,c0,true); odv.setUint32(12,d0,true);
+  return out;
+}
+const CRC = (() => {
+  const t = new Uint32Array(256);
+  for (let i=0;i<256;i++){
+    let c = i;
+    for (let j=0;j<8;j++) c = (c&1) ? (0xEDB88320 ^ (c>>>1)) : (c>>>1);
+    t[i] = c>>>0;
+  }
+  return t;
+})();
+function crc32u(crc,b){ return (crc>>>8) ^ CRC[(crc^b)&0xFF]; }
+function indexToWord(index,len,charset){
+  const base = charset.length;
+  const out = new Array(len);
+  let t = index;
+  for (let p=len-1;p>=0;p--){ out[p]=charset[t%base]; t=Math.floor(t/base); }
+  return out.join('');
+}
+function applyCase(s,mode){
+  if (mode===1) return s.toLowerCase();
+  if (mode===2) return s.toUpperCase();
+  if (mode===3) return s.charAt(0).toUpperCase()+s.slice(1);
+  if (mode===4) return s.split('').reverse().join('');
+  return s;
+}
+function bytesEq(a,b){
+  if (a.length !== b.length) return false;
+  for (let i=0;i<a.length;i++) if (a[i]!==b[i]) return false;
+  return true;
+}
+let cfg = null;
+let running = false;
+let totalDone = 0;
+let curBlock = null;
+let blockProgress = 0;
+
+function tryCandidate(index, len){
+  const word = indexToWord(index, len, cfg.charset);
+  const cased = applyCase(word, cfg.caseMode);
+  const full = cfg.prefix + cased + cfg.suffix;
+  const bytes = cfg.encoder.encode(full);
+  if (cfg.mode === 'zip'){
+    // 只做 checkByte 初筛，完整验证交给主线程
+    let k0=0x12345678, k1=0x23456789, k2=0x34567890;
+    for (let i=0;i<bytes.length;i++){
+      const b = bytes[i];
+      k0 = crc32u(k0,b);
+      k1 = ((k1 + (k0&0xFF)) * 134775813 + 1) >>> 0;
+      k2 = crc32u(k2, k1>>>24);
+    }
+    let lastByte = 0;
+    const H = cfg.zip.encHeader;
+    for (let i=0;i<12;i++){
+      const tmp = (k2|2) & 0xFFFF;
+      const decB = H[i] ^ (((tmp*(tmp^1))>>>8) & 0xFF);
+      lastByte = decB;
+      k0 = crc32u(k0, decB);
+      k1 = ((k1 + (k0&0xFF)) * 134775813 + 1) >>> 0;
+      k2 = crc32u(k2, k1>>>24);
+    }
+    return lastByte === cfg.zip.checkByte;
+  } else {
+    let digest;
+    if (cfg.algo === 'sha256') digest = sha256(bytes);
+    else if (cfg.algo === 'sha1') digest = sha1(bytes);
+    else digest = md5(bytes);
+    return bytesEq(digest, cfg.target);
+  }
+}
+
+function processBlock(){
+  if (!running || !curBlock) return;
+  const { len, start, count } = curBlock;
+  const t0 = performance.now();
+  let n = blockProgress;
+  while (n < count){
+    if (tryCandidate(start + n, len)){
+      totalDone += (n - blockProgress) + 1;
+      blockProgress = n + 1;
+      self.postMessage({ type:'candidate', index: start + n, len, total: totalDone });
+      return;
+    }
+    n++;
+    if ((n & 0xFFF) === 0 && performance.now() - t0 > 14){
+      totalDone += (n - blockProgress);
+      blockProgress = n;
+      self.postMessage({ type:'progress', total: totalDone });
+      setTimeout(processBlock, 0);
+      return;
+    }
+  }
+  totalDone += (count - blockProgress);
+  blockProgress = 0;
+  curBlock = null;
+  self.postMessage({ type:'progress', total: totalDone });
+  self.postMessage({ type:'request' });
+}
+
+self.onmessage = function(e){
+  const d = e.data;
+  if (d.type === 'start'){
+    cfg = d.cfg;
+    cfg.encoder = new TextEncoder();
+    cfg.prefix = d.cfg.prefix || '';
+    cfg.suffix = d.cfg.suffix || '';
+    cfg.target = d.cfg.target ? new Uint8Array(d.cfg.target) : null;
+    running = true;
+    totalDone = 0;
+    blockProgress = 0;
+    curBlock = null;
+    self.postMessage({ type:'request' });
+  } else if (d.type === 'block'){
+    if (!running) return;
+    curBlock = d.block;
+    blockProgress = 0;
+    processBlock();
+  } else if (d.type === 'resume'){
+    if (!running || !curBlock) return;
+    // blockProgress 已经是命中位置+1，直接继续
+    processBlock();
+  } else if (d.type === 'stop'){
+    running = false;
+  }
+};
+`;
+
+/* ============================================================
+ *  ZIP 解析（返回完整加密数据供验证）
+ * ============================================================ */
+function parseZip(buffer){
+  const dv = new DataView(buffer);
+  const len = buffer.byteLength;
+  let off = 0;
+  while (off + 30 <= len){
+    const sig = dv.getUint32(off, true);
+    if (sig !== 0x04034b50) break;
+    const flags    = dv.getUint16(off + 6, true);
+    const method   = dv.getUint16(off + 8, true);
+    const modTime  = dv.getUint16(off + 10, true);
+    const crc      = dv.getUint32(off + 14, true);
+    const compSize = dv.getUint32(off + 18, true);
+    const uncompSize = dv.getUint32(off + 22, true);
+    const nameLen  = dv.getUint16(off + 26, true);
+    const extraLen = dv.getUint16(off + 28, true);
+    const nameBytes = new Uint8Array(buffer, off + 30, nameLen);
+    let name = '';
+    try { name = new TextDecoder().decode(nameBytes); } catch(_){ name = '(binary)'; }
+    const dataStart = off + 30 + nameLen + extraLen;
+    if (flags & 0x0001){
+      if (flags & 0x0040){
+        return { error:'该 ZIP 使用 AES 强加密，暂不支持（仅支持 ZipCrypto 传统加密）' };
+      }
+      if (flags & 0x0008){
+        return { error:'该 ZIP 使用数据描述符模式（compSize=0），暂不支持。请用其他工具重新打包。' };
+      }
+      if (compSize === 0){
+        return { error:'加密条目压缩大小为 0，无法验证。' };
+      }
+      if (dataStart + 12 + compSize > len){
+        return { error:'ZIP 文件损坏或截断。' };
+      }
+      const encHeader = new Uint8Array(buffer, dataStart, 12);
+      const encData = new Uint8Array(buffer, dataStart + 12, compSize);
+      const checkByte = (crc >>> 24) & 0xFF;
+      return {
+        name, method, flags, crc, compSize, uncompSize,
+        encHeader, encData, checkByte
+      };
+    }
+    if (compSize === 0) break;
+    off = dataStart + compSize;
+  }
+  return { error:'未找到加密的 ZIP 条目（仅支持 ZipCrypto 加密）' };
+}
+
+/* ============================================================
+ *  ZIP 完整验证（解密 + 解压 + CRC32）
+ * ============================================================ */
+async function verifyZipPassword(password, info){
+  try {
+    const passBytes = new TextEncoder().encode(password);
+    let k0=0x12345678, k1=0x23456789, k2=0x34567890;
+    const crc = CRC_TABLE;
+    const update = (b) => {
+      k0 = (k0>>>8) ^ crc[(k0 ^ b) & 0xFF];
+      k1 = ((k1 + (k0 & 0xFF)) * 134775813 + 1) >>> 0;
+      k2 = (k2>>>8) ^ crc[(k2 ^ (k1>>>24)) & 0xFF];
+    };
+    const decryptByte = () => {
+      const t = (k2 | 2) & 0xFFFF;
+      return ((t * (t ^ 1)) >>> 8) & 0xFF;
+    };
+    for (let i=0;i<passBytes.length;i++) update(passBytes[i]);
+    // 消费 12 字节头
+    for (let i=0;i<12;i++){
+      const b = info.encHeader[i] ^ decryptByte();
+      update(b);
+    }
+    // 解密数据
+    const encData = info.encData;
+    const plain = new Uint8Array(encData.length);
+    for (let i=0;i<encData.length;i++){
+      plain[i] = encData[i] ^ decryptByte();
+      update(plain[i]);
+    }
+    let finalData;
+    if (info.method === 0){
+      finalData = plain;
+    } else if (info.method === 8){
+      if (typeof DecompressionStream === 'undefined'){
+        return { ok:false, reason:'no_decompression' };
+      }
+      const ds = new DecompressionStream('deflate-raw');
+      const writer = ds.writable.getWriter();
+      writer.write(plain);
+      writer.close();
+      const reader = ds.readable.getReader();
+      const chunks = [];
+      let totalLen = 0;
+      while (true){
+        const {done, value} = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        totalLen += value.length;
+      }
+      finalData = new Uint8Array(totalLen);
+      let off = 0;
+      for (const c of chunks){ finalData.set(c, off); off += c.length; }
+    } else {
+      return { ok:false, reason:'unsupported_method' };
+    }
+    let c = 0xFFFFFFFF;
+    for (let i=0;i<finalData.length;i++) c = (c>>>8) ^ crc[(c ^ finalData[i]) & 0xFF];
+    c = (c ^ 0xFFFFFFFF) >>> 0;
+    return { ok: c === info.crc, computed: c, expected: info.crc };
+  } catch(e){
+    return { ok:false, reason:'error:' + e.message };
+  }
+}
+
+/* ============================================================
+ *  主控
+ * ============================================================ */
+let gpu = null;
+let worker = null;
+let workerURL = null;
+let pool = null;
+let running = false;
+let finished = false;
+let tStart = 0;
+let gpuCount = 0;
+let cpuCount = 0;
+let gpuSpeed = 0, cpuSpeed = 0;
+let lastGpu = 0, lastCpu = 0, lastTime = 0;
+let statsTimer = null;
+let currentTask = null;
+let currentMode = 'hash';
+let zipData = null;
+let falsePositives = 0;
+let verifyQueue = [];
+let verifyBusy = false;
+
+const els = {
+  hashInput: $('hashInput'), algoSelect: $('algoSelect'), caseMode: $('caseMode'),
+  saltType: $('saltType'), saltValue: $('saltValue'), saltValueField: $('saltValueField'),
+  lenInput: $('lenInput'), errSelect: $('errSelect'),
+  cbLower: $('cbLower'), cbUpper: $('cbUpper'), cbDigit: $('cbDigit'), cbSpecial: $('cbSpecial'),
+  specialField: $('specialField'), specialChars: $('specialChars'),
+  btnStart: $('btnStart'), btnStop: $('btnStop'),
+  btnRandomHash: $('btnRandomHash'), btnMakeZip: $('btnMakeZip'),
+  errBox: $('errBox'), warnBox: $('warnBox'),
+  zipPanel: $('zipPanel'), hashPanel: $('hashPanel'),
+  zipFile: $('zipFile'), zipInfo: $('zipInfo'), zipWarn: $('zipWarn'),
+  resultBox: $('resultBox'), resultLabel: $('resultLabel'),
+  resultPlain: $('resultPlain'), resultMeta: $('resultMeta'),
+  stTotal: $('stTotal'), stTime: $('stTime'), stSpeed: $('stSpeed'), stSpace: $('stSpace'),
+  stFP: $('stFP'),
+  gpuNum: $('gpuNum'), cpuNum: $('cpuNum'), gpuBar: $('gpuBar'), cpuBar: $('cpuBar')
+};
+
+document.querySelectorAll('.tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode = btn.dataset.mode;
+    if (currentMode === 'zip'){
+      els.hashPanel.style.display = 'none';
+      els.zipPanel.style.display = '';
+      els.btnRandomHash.style.display = 'none';
+      els.btnMakeZip.style.display = '';
+    } else {
+      els.hashPanel.style.display = '';
+      els.zipPanel.style.display = 'none';
+      els.btnRandomHash.style.display = '';
+      els.btnMakeZip.style.display = 'none';
+    }
+    els.errBox.textContent = '';
+    els.warnBox.textContent = '';
+    els.resultBox.classList.remove('show','found');
+  });
+});
+
+els.saltType.addEventListener('change', () => {
+  els.saltValueField.style.display = els.saltType.value === 'none' ? 'none' : '';
+});
+els.cbSpecial.addEventListener('change', () => {
+  els.specialField.style.display = els.cbSpecial.checked ? '' : 'none';
+});
+
+function buildCharset(){
+  let s = '';
+  if (els.cbLower.checked) s += 'abcdefghijklmnopqrstuvwxyz';
+  if (els.cbUpper.checked) s += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  if (els.cbDigit.checked) s += '0123456789';
+  if (els.cbSpecial.checked) s += els.specialChars.value;
+  return Array.from(new Set(s.split('')));
+}
+function splitSalt(){
+  const type = els.saltType.value;
+  const val = els.saltValue.value;
+  if (type === 'none' || !val) return { prefix:'', suffix:'' };
+  if (type === 'prefix') return { prefix:val, suffix:'' };
+  if (type === 'suffix') return { prefix:'', suffix:val };
+  if (val.indexOf('{word}') < 0) return { prefix:val, suffix:'' };
+  const idx = val.indexOf('{word}');
+  return { prefix: val.slice(0, idx), suffix: val.slice(idx + 6) };
+}
+
+function updateStats(){
+  const now = performance.now();
+  const elapsed = (now - tStart) / 1000;
+  const total = gpuCount + cpuCount;
+  els.stTotal.textContent = fmt(total);
+  els.stTime.textContent = elapsed.toFixed(1) + 's';
+  els.stSpeed.textContent = elapsed > 0.1 ? fmt(total/elapsed) + ' H/s' : '—';
+  if (now - lastTime > 250){
+    const dt = (now - lastTime) / 1000;
+    if (dt > 0){
+      gpuSpeed = (gpuCount - lastGpu) / dt;
+      cpuSpeed = (cpuCount - lastCpu) / dt;
+    }
+    lastGpu = gpuCount; lastCpu = cpuCount; lastTime = now;
+  }
+  els.gpuNum.textContent = fmt(gpuCount) + ' 次 · ' + fmt(gpuSpeed) + ' H/s';
+  els.cpuNum.textContent = fmt(cpuCount) + ' 次 · ' + fmt(cpuSpeed) + ' H/s';
+  if (pool && pool.totalSpace > 0){
+    els.gpuBar.style.width = Math.min(100, gpuCount/pool.totalSpace*100) + '%';
+    els.cpuBar.style.width = Math.min(100, cpuCount/pool.totalSpace*100) + '%';
+  }
+  els.stFP.textContent = falsePositives.toLocaleString();
+}
+
+function showResult(plain, engine, len, isZip){
+  finished = true;
+  stopAll();
+  els.resultBox.classList.add('show');
+  els.resultBox.classList.remove('found');
+  void els.resultBox.offsetWidth;
+  els.resultBox.classList.add('found');
+  els.resultLabel.textContent = isZip ? '✅ ZIP 密码（已通过 CRC 验证）' : '✅ 找到匹配原文';
+  els.resultPlain.textContent = plain;
+  els.resultPlain.style.color = isZip ? 'var(--orange)' : 'var(--green)';
+  const total = gpuCount + cpuCount;
+  const elapsed = (performance.now() - tStart) / 1000;
+  let extra = '';
+  if (isZip){
+    extra = `<br>已排除假阳性：<b>${falsePositives}</b> 个（1/256 校验误报）`;
+  }
+  els.resultMeta.innerHTML =
+    `发现引擎：<b>${engine}</b> &nbsp;|&nbsp; 长度：<b>${len}</b> 位<br>` +
+    `总尝试：<b>${total.toLocaleString()}</b> 次 &nbsp;|&nbsp; 耗时：<b>${elapsed.toFixed(2)}s</b> ` +
+    `&nbsp;|&nbsp; 平均速度：<b>${fmt(total/Math.max(elapsed,0.001))} H/s</b>` + extra;
+}
+
+function stopAll(){
+  running = false;
+  els.btnStart.disabled = false;
+  els.btnStop.disabled = true;
+  if (statsTimer){ clearInterval(statsTimer); statsTimer = null; }
+  if (worker){ worker.terminate(); worker = null; }
+  updateStats();
+}
+
+/* ---------- 验证队列 ---------- */
+function enqueueVerify(index, len, engine, source){
+  verifyQueue.push({ index, len, engine, source });
+  if (!verifyBusy) processVerifyQueue();
+}
+
+async function processVerifyQueue(){
+  if (verifyBusy) return;
+  verifyBusy = true;
+  while (verifyQueue.length > 0 && !finished){
+    const item = verifyQueue.shift();
+    const plain = buildPlainFromIndex(item.index, item.len);
+    if (currentMode === 'zip'){
+      const res = await verifyZipPassword(plain, zipData);
+      if (finished) { verifyBusy = false; return; }
+      if (res.ok){
+        verifyBusy = false;
+        showResult(plain, item.engine, item.len, true);
+        return;
+      } else {
+        falsePositives++;
+        updateStats();
+        // 恢复对应引擎
+        if (item.source === 'worker' && worker && running){
+          worker.postMessage({ type:'resume' });
+        } else if (item.source === 'gpu' && running){
+          setTimeout(gpuLoop, 0);
+        }
+      }
+    } else {
+      verifyBusy = false;
+      showResult(plain, item.engine, item.len, false);
+      return;
+    }
+  }
+  verifyBusy = false;
+}
+
+/* ---------- GPU 循环 ---------- */
+function gpuLoop(){
+  if (!running || finished || !gpu || !pool) return;
+  const t0 = performance.now();
+  let guard = 0;
+  while (performance.now() - t0 < 8 && guard < 64){
+    guard++;
+    const block = pool.next();
+    if (!block){ setTimeout(gpuLoop, 50); return; }
+    let r;
+    try {
+      r = gpu.step(block, currentTask);
+    } catch(e){
+      console.error('GPU step error:', e);
+      return;
+    }
+    if (r.found){
+      const localIdx = r.index - block.start;
+      gpuCount += localIdx + 1;
+      const remaining = block.count - localIdx - 1;
+      if (remaining > 0){
+        pool.pushFront({ len: block.len, start: r.index + 1, count: remaining });
+      }
+      enqueueVerify(r.index, r.len, 'GPU Shader', 'gpu');
+      return; // 暂停，等验证结果
+    }
+    gpuCount += block.count;
+  }
+  if (running && !finished) setTimeout(gpuLoop, 0);
+}
+
+function buildPlainFromIndex(index, len){
+  const word = indexToWord(index, len, currentTask.charset);
+  const cased = applyCase(word, currentTask.caseMode);
+  return currentTask.prefix + cased + currentTask.suffix;
+}
+
+/* ---------- 启动 ---------- */
+function startSearch(){
+  els.errBox.textContent = '';
+  els.warnBox.textContent = '';
+  els.zipWarn.textContent = '';
+  els.resultBox.classList.remove('show','found');
+  falsePositives = 0;
+  verifyQueue = [];
+  verifyBusy = false;
+
+  const charset = buildCharset();
+  if (charset.length < 2){
+    els.errBox.textContent = '❌ 请至少勾选一种字符集（且字符数 ≥ 2）。';
+    return;
+  }
+  const salt = splitSalt();
+  const prefix = salt.prefix;
+  const suffix = salt.suffix;
+  const caseMode = els.caseMode.value;
+
+  let baseLen = parseInt(els.lenInput.value, 10) || 4;
+  const err = parseInt(els.errSelect.value, 10) || 0;
+  const warnings = [];
+  const lens = [];
+  for (let L = Math.max(1, baseLen - err); L <= baseLen + err; L++){
+    const sp = Math.pow(charset.length, L);
+    if (sp > MAX_SPACE_PER_LEN){
+      warnings.push(`长度 ${L} 搜索空间 ${fmt(sp)} 超过 32 位索引上限，已跳过。`);
+      continue;
+    }
+    lens.push(L);
+  }
+  if (lens.length === 0){
+    els.errBox.textContent = '❌ 没有可搜索的长度，请减小位数或减少字符集。';
+    return;
+  }
+  lens.sort((a,b) => Math.abs(a-baseLen) - Math.abs(b-baseLen) || a-b);
+
+  let task;
+  let targetBytes = null;
+
+  if (currentMode === 'zip'){
+    if (!zipData){ els.errBox.textContent = '❌ 请先上传加密 ZIP 文件。'; return; }
+    if (zipData.error){ els.errBox.textContent = '❌ ' + zipData.error; return; }
+    const prefixBytes = utf8Bytes(prefix);
+    const suffixBytes = utf8Bytes(suffix);
+    task = {
+      mode: 'zip', charset,
+      baseN: charset.length,
+      charsU32: new Uint32Array(charset.map(c => c.charCodeAt(0))),
+      prefix, suffix,
+      prefixU32: new Uint32Array(prefixBytes),
+      prefixLen: prefixBytes.length,
+      suffixU32: new Uint32Array(suffixBytes),
+      suffixLen: suffixBytes.length,
+      caseMode,
+      encHeaderU32: new Uint32Array(zipData.encHeader.buffer.slice(0, 12)),
+      checkByte: zipData.checkByte
+    };
+  } else {
+    const hex = (els.hashInput.value || '').trim().toLowerCase().replace(/^0x/, '');
+    const algo = els.algoSelect.value;
+    const expectedLen = algo === 'sha256' ? 64 : algo === 'sha1' ? 40 : 32;
+    if (!new RegExp('^[0-9a-f]{' + expectedLen + '}$').test(hex)){
+      els.errBox.textContent = `❌ ${algo.toUpperCase()} 哈希应为 ${expectedLen} 位十六进制。`;
+      return;
+    }
+    targetBytes = hexToBytes(hex);
+    const prefixBytes = utf8Bytes(prefix);
+    const suffixBytes = utf8Bytes(suffix);
+    task = {
+      mode: 'hash', algo, charset,
+      baseN: charset.length,
+      charsU32: new Uint32Array(charset.map(c => c.charCodeAt(0))),
+      prefix, suffix,
+      prefixU32: new Uint32Array(prefixBytes),
+      prefixLen: prefixBytes.length,
+      suffixU32: new Uint32Array(suffixBytes),
+      suffixLen: suffixBytes.length,
+      caseMode,
+      targetU32: new Uint32Array(8)
+    };
+    const full = new Uint8Array(32);
+    full.set(targetBytes);
+    const dv = new DataView(full.buffer);
+    for (let i=0;i<8;i++) task.targetU32[i] = dv.getUint32(i*4, false);
+  }
+
+  currentTask = task;
+
+  let gpuUsable = false;
+  if (task.mode === 'zip' || task.algo === 'sha256'){
+    if (charset.length > MAX_CHARS_GPU){
+      warnings.push(`字符集 ${charset.length} 个超过 GPU 上限 ${MAX_CHARS_GPU}，GPU 停用。`);
+    } else if (task.prefixLen > MAX_SALT_GPU || task.suffixLen > MAX_SALT_GPU){
+      warnings.push(`盐长度超过 ${MAX_SALT_GPU} 字节，GPU 停用。`);
+    } else {
+      try {
+        if (!gpu) gpu = new GPUEngine($('glcanvas'));
+        gpuUsable = true;
+      } catch(e){
+        warnings.push('GPU 初始化失败：' + e.message + '（将仅用 CPU）');
+      }
+    }
+  } else {
+    warnings.push(`${task.algo.toUpperCase()} 仅用 CPU 计算（GPU 仅支持 SHA-256 / ZipCrypto）。`);
+  }
+
+  if (gpuUsable){
+    const filtered = [];
+    for (const L of lens){
+      if (task.prefixLen + L + task.suffixLen <= MAX_LEN_GPU) filtered.push(L);
+      else warnings.push(`长度 ${L} 消息总长超过 ${MAX_LEN_GPU} 字节，GPU 跳过该长度。`);
+    }
+    if (filtered.length === 0 || filtered.length < lens.length){
+      gpuUsable = false;
+      warnings.push('存在 GPU 不支持的长度，为保证一致性，本次仅用 CPU。');
+    }
+  }
+
+  pool = new TaskPool(lens, charset.length, BLOCK_SIZE);
+
+  if (gpuUsable && gpu){
+    try {
+      gpu.prepare(task);
+      gpu.step({ len: lens[0], start: 0, count: 1 }, task);
+    } catch(e){
+      warnings.push('GPU 预热失败：' + e.message + '（仅用 CPU）');
+      gpuUsable = false;
+    }
+  }
+
+  try {
+    if (!workerURL){
+      const blob = new Blob([WORKER_SRC], { type:'application/javascript' });
+      workerURL = URL.createObjectURL(blob);
+    }
+    if (worker) worker.terminate();
+    worker = new Worker(workerURL);
+    worker.onmessage = onWorkerMessage;
+    worker.postMessage({
+      type: 'start',
+      cfg: {
+        mode: task.mode,
+        algo: task.algo || 'sha256',
+        charset: task.charset,
+        prefix: task.prefix,
+        suffix: task.suffix,
+        caseMode: task.caseMode,
+        target: targetBytes ? Array.from(targetBytes) : null,
+        zip: task.mode === 'zip' ? {
+          encHeader: Array.from(task.encHeaderU32),
+          checkByte: task.checkByte
+        } : null
+      }
+    });
+  } catch(e){
+    warnings.push('CPU Worker 启动失败：' + e.message);
+    worker = null;
+  }
+
+  if (warnings.length) els.warnBox.innerHTML = warnings.map(w => '⚠ ' + w).join('<br>');
+
+  running = true;
+  finished = false;
+  gpuCount = 0;
+  cpuCount = 0;
+  gpuSpeed = 0; cpuSpeed = 0;
+  lastGpu = 0; lastCpu = 0; lastTime = performance.now();
+  tStart = performance.now();
+  els.btnStart.disabled = true;
+  els.btnStop.disabled = false;
+  els.stSpace.textContent = fmt(pool.totalSpace);
+  if (statsTimer) clearInterval(statsTimer);
+  statsTimer = setInterval(updateStats, 150);
+  updateStats();
+  if (gpuUsable && gpu) gpuLoop();
+}
+
+function onWorkerMessage(ev){
+  const d = ev.data;
+  if (d.type === 'progress'){ cpuCount = d.total; }
+  else if (d.type === 'request'){
+    if (!running) return;
+    const block = pool.next();
+    if (block) worker.postMessage({ type:'block', block });
+    else worker.postMessage({ type:'stop' });
+  }
+  else if (d.type === 'candidate'){
+    cpuCount = d.total;
+    if (finished) return;
+    enqueueVerify(d.index, d.len, 'CPU Worker', 'worker');
+  }
+}
+
+async function randomTestHash(){
+  const charset = buildCharset();
+  if (charset.length < 2){ els.errBox.textContent = '❌ 请至少勾选一种字符集。'; return; }
+  let baseLen = Math.min(parseInt(els.lenInput.value, 10) || 4, 10);
+  let plain = '';
+  const rnd = new Uint32Array(baseLen);
+  crypto.getRandomValues(rnd);
+  for (let i=0;i<baseLen;i++) plain += charset[rnd[i] % charset.length];
+  const salt = splitSalt();
+  const cased = applyCase(plain, els.caseMode.value);
+  const full = salt.prefix + cased + salt.suffix;
+  try {
+    const algo = els.algoSelect.value;
+    const bytes = utf8Bytes(full);
+    const hashAlg = algo === 'sha256' ? 'SHA-256' : algo === 'sha1' ? 'SHA-1' : 'MD5';
+    const d = await crypto.subtle.digest(hashAlg, bytes);
+    els.hashInput.value = bytesToHex(new Uint8Array(d));
+    els.errBox.textContent = '';
+    els.warnBox.innerHTML = `💡 测试哈希已生成。原文（含盐）：<code>${full.replace(/</g,'&lt;')}</code>（长度 ${plain.length}）`;
+  } catch(e){
+    els.errBox.textContent = '❌ 生成失败：' + e.message;
+  }
+}
+
+els.zipFile.addEventListener('change', async () => {
+  els.zipInfo.textContent = '';
+  els.zipWarn.textContent = '';
+  zipData = null;
+  const file = els.zipFile.files[0];
+  if (!file) return;
+  try {
+    const buf = await file.arrayBuffer();
+    const info = parseZip(buf);
+    if (info.error){
+      zipData = info;
+      els.zipInfo.innerHTML = `<span style="color:var(--red)">❌ ${info.error}</span>`;
+      return;
+    }
+    zipData = info;
+    els.zipInfo.innerHTML =
+      `文件名：<b>${info.name}</b><br>` +
+      `压缩方式：<b>${info.method === 0 ? 'STORE（不压缩）' : 'DEFLATE（压缩）'}</b><br>` +
+      `加密数据：<b>${info.encData.length}</b> 字节 &nbsp; 校验字节：<b>0x${info.checkByte.toString(16).padStart(2,'0')}</b><br>` +
+      `CRC 期望值：<b>0x${info.crc.toString(16).padStart(8,'0')}</b>`;
+    if (info.method === 8 && typeof DecompressionStream === 'undefined'){
+      els.zipWarn.innerHTML = '⚠ 当前浏览器不支持 DecompressionStream，DEFLATE 压缩的 ZIP 将无法完整验证。请用 Chrome/Edge 最新版。';
+    } else if (info.method === 8){
+      els.zipWarn.innerHTML = '💡 DEFLATE 模式命中后会解压并校验 CRC32，请耐心等待验证完成（大文件可能几秒）。';
+    }
+  } catch(e){
+    els.zipInfo.innerHTML = `<span style="color:var(--red)">❌ 读取失败：${e.message}</span>`;
+  }
+});
+
+function crc32bytes(bytes){
+  let c = 0xFFFFFFFF;
+  for (let i=0;i<bytes.length;i++) c = (c>>>8) ^ CRC_TABLE[(c ^ bytes[i]) & 0xFF];
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function makeTestZip(password, content){
+  const enc = new TextEncoder();
+  const passBytes = enc.encode(password);
+  const dataBytes = enc.encode(content);
+  const nameBytes = enc.encode('test.txt');
+  const crc = crc32bytes(dataBytes);
+  const size = dataBytes.length;
+  let k0 = 0x12345678, k1 = 0x23456789, k2 = 0x34567890;
+  const update = (b) => {
+    k0 = (k0>>>8) ^ CRC_TABLE[(k0 ^ b) & 0xFF];
+    k1 = ((k1 + (k0 & 0xFF)) * 134775813 + 1) >>> 0;
+    k2 = (k2>>>8) ^ CRC_TABLE[(k2 ^ (k1>>>24)) & 0xFF];
+  };
+  const decryptByte = () => {
+    const t = (k2 | 2) & 0xFFFF;
+    return ((t * (t ^ 1)) >>> 8) & 0xFF;
+  };
+  for (let i=0;i<passBytes.length;i++) update(passBytes[i]);
+  const header = new Uint8Array(12);
+  crypto.getRandomValues(header);
+  header[11] = (crc >>> 24) & 0xFF;
+  const encHeader = new Uint8Array(12);
+  for (let i=0;i<12;i++){
+    encHeader[i] = header[i] ^ decryptByte();
+    update(header[i]);
+  }
+  const encData = new Uint8Array(size);
+  for (let i=0;i<size;i++){
+    encData[i] = dataBytes[i] ^ decryptByte();
+    update(dataBytes[i]);
+  }
+  const localHeader = new Uint8Array(30 + nameBytes.length);
+  const dv = new DataView(localHeader.buffer);
+  dv.setUint32(0, 0x04034b50, true);
+  dv.setUint16(4, 20, true);
+  dv.setUint16(6, 0x0001, true);
+  dv.setUint16(8, 0, true);
+  dv.setUint16(10, 0, true);
+  dv.setUint16(12, 0x21, true);
+  dv.setUint32(14, crc, true);
+  dv.setUint32(18, 12 + size, true);
+  dv.setUint32(22, size, true);
+  dv.setUint16(26, nameBytes.length, true);
+  dv.setUint16(28, 0, true);
+  localHeader.set(nameBytes, 30);
+  const cd = new Uint8Array(46 + nameBytes.length);
+  const cdv = new DataView(cd.buffer);
+  cdv.setUint32(0, 0x02014b50, true);
+  cdv.setUint16(4, 20, true);
+  cdv.setUint16(6, 20, true);
+  cdv.setUint16(8, 0x0001, true);
+  cdv.setUint16(10, 0, true);
+  cdv.setUint16(12, 0, true);
+  cdv.setUint16(14, 0x21, true);
+  cdv.setUint32(16, crc, true);
+  cdv.setUint32(20, 12 + size, true);
+  cdv.setUint32(24, size, true);
+  cdv.setUint16(28, nameBytes.length, true);
+  cdv.setUint16(30, 0, true);
+  cdv.setUint16(32, 0, true);
+  cdv.setUint16(34, 0, true);
+  cdv.setUint16(36, 0, true);
+  cdv.setUint32(38, 0, true);
+  cdv.setUint32(42, 0, true);
+  cd.set(nameBytes, 46);
+  const eocd = new Uint8Array(22);
+  const edv = new DataView(eocd.buffer);
+  edv.setUint32(0, 0x06054b50, true);
+  edv.setUint16(4, 0, true);
+  edv.setUint16(6, 0, true);
+  edv.setUint16(8, 1, true);
+  edv.setUint16(10, 1, true);
+  edv.setUint32(12, cd.length, true);
+  edv.setUint32(16, localHeader.length + 12 + size, true);
+  edv.setUint16(20, 0, true);
+  const total = localHeader.length + 12 + size + cd.length + eocd.length;
+  const out = new Uint8Array(total);
+  let p = 0;
+  out.set(localHeader, p); p += localHeader.length;
+  out.set(encHeader, p); p += 12;
+  out.set(encData, p); p += size;
+  out.set(cd, p); p += cd.length;
+  out.set(eocd, p);
+  return out;
+}
+
+els.btnMakeZip.addEventListener('click', () => {
+  try {
+    const zip = makeTestZip('pass123', 'hello world from GPU+CPU cracker!');
+    const blob = new Blob([zip], { type:'application/zip' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'test_encrypted.zip';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    els.zipWarn.innerHTML = '💡 已生成测试 ZIP，密码为 <code>pass123</code>。位数 7、字符集小写+数字，约 36^7 空间。';
+  } catch(e){
+    els.zipWarn.innerHTML = '❌ 生成失败：' + e.message;
+  }
+});
+
+els.btnStart.addEventListener('click', startSearch);
+els.btnStop.addEventListener('click', () => {
+  finished = true;
+  verifyQueue = [];
+  stopAll();
+  els.resultBox.classList.add('show');
+  els.resultBox.classList.remove('found');
+  els.resultLabel.textContent = '⏹ 已停止';
+  els.resultPlain.textContent = '—';
+  els.resultPlain.style.color = 'var(--orange)';
+  els.resultMeta.innerHTML = `总尝试：<b>${(gpuCount+cpuCount).toLocaleString()}</b> 次 &nbsp;|&nbsp; 假阳性：<b>${falsePositives}</b>`;
+});
+els.btnRandomHash.addEventListener('click', randomTestHash);
+
+els.hashInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !els.btnStart.disabled) startSearch();
+});
+
+(function(){
+  const c = document.createElement('canvas');
+  const gl = c.getContext('webgl2');
+  if (!gl){
+    els.warnBox.innerHTML = '⚠ 当前浏览器不支持 WebGL2，GPU 加速不可用，将仅用 CPU。';
+  } else {
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    const maxVec = gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS);
+    if (dbg){
+      const r = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
+      els.warnBox.innerHTML = `🖥 GPU 设备：<code>${String(r).slice(0,80)}</code> &nbsp;|&nbsp; Uniform 槽位：<b>${maxVec}</b>`;
+    }
+  }
+})();
+
+})();
+</script>
+</body>
+</html>
